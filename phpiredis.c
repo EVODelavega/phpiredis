@@ -331,6 +331,7 @@ PHP_FUNCTION(phpiredis_multi_command_bs)
 PHP_FUNCTION(phpiredis_command)
 {
     zval *resource;
+    zval *ex = NULL;
     redisReply *reply = NULL;
     phpiredis_connection *connection;
     char *command;
@@ -350,7 +351,12 @@ PHP_FUNCTION(phpiredis_command)
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
-        zend_throw_exception(zend_exception_get_default(TSRMLS_C), reply->str, 0 TSRMLS_CC);
+        ex = zend_throw_exception_ex(
+            zend_exception_get_default(TSRMLS_C),
+            0 TSRMLS_CC,
+            "phpiredis error: %s",
+            reply->str
+        );
         //php_error_docref(NULL TSRMLS_CC, E_WARNING, reply->str);
         freeReplyObject(reply);
 
@@ -368,6 +374,7 @@ PHP_FUNCTION(phpiredis_command_bs)
     redisReply *reply = NULL;
     phpiredis_connection *connection;
     zval *params;
+    zval *ex = NULL;
     int argc;
     char ** argv;
     size_t * argvlen;
@@ -411,9 +418,19 @@ PHP_FUNCTION(phpiredis_command_bs)
                     break;
 
                 default:
-                    zend_throw_exception(spl_ce_InvalidArgumentException, "Array argument must contain strings", 0 TSRMLS_CC);
+                    ex = zend_throw_exception(spl_ce_InvalidArgumentException, "Array argument must contain strings", 0 TSRMLS_CC);
                     //php_error_docref(NULL TSRMLS_CC, E_WARNING, "Array argument must contain strings");
                     break;
+        }
+        if (ex != NULL) {
+            do {
+                efree(argv[i]);
+                --i;
+            } while( i-- > 0);
+            efree(argv);
+            efree(argvlen);
+            RETURN_FALSE;
+            return;
         }
 
         zend_hash_move_forward_ex(Z_ARRVAL_P(params), &pos);
@@ -437,7 +454,12 @@ PHP_FUNCTION(phpiredis_command_bs)
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
-        zend_throw_exception(zend_exception_get_default(TSRMLS_C), reply->str, 0 TSRMLS_CC);
+        ex = zend_throw_exception_ex(
+            zend_exception_get_default(TSRMLS_C),
+            0 TSRMLS_CC,
+            "redis error: %s",
+            reply->str
+        );
         //php_error_docref(NULL TSRMLS_CC, E_WARNING, "%s", reply->str);
         freeReplyObject(reply);
 
@@ -608,7 +630,7 @@ PHP_FUNCTION(phpiredis_reader_create)
 
 PHP_FUNCTION(phpiredis_reader_set_error_handler)
 {
-    zval *ptr, **function;
+    zval *ptr, **function, *ex = NULL;
     phpiredis_reader *reader;
     char *name;
 
@@ -622,8 +644,13 @@ PHP_FUNCTION(phpiredis_reader_set_error_handler)
         free_reader_error_callback(reader TSRMLS_CC);
     } else {
         if (!zend_is_callable(*function, 0, &name TSRMLS_CC)) {
+            ex = zend_throw_exception_ex(
+                spl_ce_InvalidArgumentException,
+                0 TSRMLS_CC,
+                "Argument %s is not a valid callback function",
+                name
+            );
             efree(name);
-            zend_throw_exception(spl_ce_InvalidArgumentException, "Argument is not a valid callback", 0 TSRMLS_CC);
             //php_error_docref(NULL TSRMLS_CC, E_WARNING, "Argument is not a valid callback");
             RETURN_FALSE;
             return;
@@ -643,7 +670,7 @@ PHP_FUNCTION(phpiredis_reader_set_error_handler)
 
 PHP_FUNCTION(phpiredis_reader_set_status_handler)
 {
-    zval *ptr, **function;
+    zval *ptr, **function, *ex;
     phpiredis_reader *reader;
     char *name;
 
@@ -657,8 +684,14 @@ PHP_FUNCTION(phpiredis_reader_set_status_handler)
         free_reader_status_callback(reader TSRMLS_CC);
     } else {
         if (!zend_is_callable(*function, 0, &name TSRMLS_CC)) {
+            ex = zend_throw_exception_ex(
+                spl_ce_InvalidArgumentException,
+                0 TSRMLS_CC,
+                "Argument '%s' is not a valid callback",
+                name
+            );
             efree(name);
-            zend_throw_exception(spl_ce_InvalidArgumentException, "Argument is not a valid callback", 0 TSRMLS_CC);
+            free_reader_status_callback(reader TSRMLS_CC);
             //php_error_docref(NULL TSRMLS_CC, E_WARNING, "Argument is not a valid callback");
             RETURN_FALSE;
             return;

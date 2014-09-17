@@ -1,7 +1,8 @@
 #include "hiredis/hiredis.h"
 #include "php_phpiredis.h"
 #include "php_phpiredis_struct.h"
-
+#include "ext/spl/spl_exceptions.h"
+#include "zend_exceptions.h"
 #include "ext/standard/head.h"
 #include "ext/standard/info.h"
 
@@ -349,7 +350,8 @@ PHP_FUNCTION(phpiredis_command)
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
-        php_error_docref(NULL TSRMLS_CC, E_WARNING, reply->str);
+        zend_throw_exception(zend_exception_get_default(TSRMLS_C), reply->str, 0 TSRMLS_CC);
+        //php_error_docref(NULL TSRMLS_CC, E_WARNING, reply->str);
         freeReplyObject(reply);
 
         RETURN_FALSE;
@@ -409,7 +411,8 @@ PHP_FUNCTION(phpiredis_command_bs)
                     break;
 
                 default:
-                    php_error_docref(NULL TSRMLS_CC, E_WARNING, "Array argument must contain strings");
+                    zend_throw_exception(spl_ce_InvalidArgumentException, "Array argument must contain strings", 0 TSRMLS_CC);
+                    //php_error_docref(NULL TSRMLS_CC, E_WARNING, "Array argument must contain strings");
                     break;
         }
 
@@ -434,7 +437,8 @@ PHP_FUNCTION(phpiredis_command_bs)
     }
 
     if (reply->type == REDIS_REPLY_ERROR) {
-        php_error_docref(NULL TSRMLS_CC, E_WARNING, "%s", reply->str);
+        zend_throw_exception(zend_exception_get_default(TSRMLS_C), reply->str, 0 TSRMLS_CC);
+        //php_error_docref(NULL TSRMLS_CC, E_WARNING, "%s", reply->str);
         freeReplyObject(reply);
 
         RETURN_FALSE;
@@ -618,9 +622,11 @@ PHP_FUNCTION(phpiredis_reader_set_error_handler)
         free_reader_error_callback(reader TSRMLS_CC);
     } else {
         if (!zend_is_callable(*function, 0, &name TSRMLS_CC)) {
-            php_error_docref(NULL TSRMLS_CC, E_WARNING, "Argument is not a valid callback");
             efree(name);
+            zend_throw_exception(spl_ce_InvalidArgumentException, "Argument is not a valid callback", 0 TSRMLS_CC);
+            //php_error_docref(NULL TSRMLS_CC, E_WARNING, "Argument is not a valid callback");
             RETURN_FALSE;
+            return;
         }
 
         efree(name);
@@ -651,9 +657,11 @@ PHP_FUNCTION(phpiredis_reader_set_status_handler)
         free_reader_status_callback(reader TSRMLS_CC);
     } else {
         if (!zend_is_callable(*function, 0, &name TSRMLS_CC)) {
-            php_error_docref(NULL TSRMLS_CC, E_WARNING, "Argument is not a valid callback");
             efree(name);
+            zend_throw_exception(spl_ce_InvalidArgumentException, "Argument is not a valid callback", 0 TSRMLS_CC);
+            //php_error_docref(NULL TSRMLS_CC, E_WARNING, "Argument is not a valid callback");
             RETURN_FALSE;
+            return;
         }
 
         efree(name);
